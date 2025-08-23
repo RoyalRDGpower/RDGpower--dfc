@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Deepfake Control Portal</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #1e1e1e; color: white; margin: 0; }
+    .login-container, .main-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .panel { background: #2c2c2c; padding: 20px; border-radius: 8px; }
+    button { background: #4cafef; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #3a9dd6; }
+    .collapsible { background-color: #444; cursor: pointer; padding: 10px; width: 100%; border: none; text-align: left; outline: none; }
+    .active, .collapsible:hover { background-color: #555; }
+    .content { padding: 0 15px; display: none; overflow: hidden; background-color: #333; }
+    video, canvas { width: 480px; height: 360px; margin-top: 10px; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-container" id="login-container">
+    <div class="panel">
+        <h2>Login</h2>
+        <input type="text" id="username" placeholder="Username"><br><br>
+        <input type="password" id="password" placeholder="Password"><br><br>
+        <button onclick="login()">Login</button>
+    </div>
+</div>
+
+<!-- Main -->
+<div class="main-container" id="main-container" style="display:none;">
+    <div class="panel">
+        <h1>Deepfake Control Portal</h1>
+        
+        <!-- Video / WebGPU Processing -->
+        <video id="localVideo" autoplay playsinline></video>
+        <canvas id="processedVideo" width="640" height="480"></canvas>
+        
+        <!-- Controls -->
+        <button class="collapsible">Controls</button>
+        <div class="content">
+            <button onclick="sendCommand('start')">Start</button>
+            <button onclick="sendCommand('stop')">Stop</button>
+        </div>
+
+        <!-- Voice -->
+        <button class="collapsible">Voice Control</button>
+        <div class="content">
+            <button onclick="startVoice()">🎤 Start Voice Command</button>
+        </div>
+
+        <!-- Telegram Hook -->
+        <button class="collapsible">Telegram API</button>
+        <div class="content">
+            <button onclick="sendTelegram('Test message from portal')">Send Test</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu"></script>
+
+<script>
+let ws;
+
+// ✅ Login
+function login() {
+    const user = document.getElementById("Rdgpower").value; // match ID
+    const pass = document.getElementById("447799").value;   // match ID
+    
+    if (user === "admin" && pass === "1234") {
+        document.getElementById("login-container").style.display = "none";
+        document.getElementById("main-container").style.display = "flex";
+        connectWS();
+    } else {
+        alert("Invalid login!");
+    }
+}
+
+    }
+}
+
+// ✅ WebSocket connect
+function connectWS() {
+    ws = new WebSocket("ws://localhost:3000");
+    ws.onopen = () => console.log("Connected to server");
+    ws.onmessage = (msg) => console.log("Server says:", msg.data);
+}
+
+// ✅ Commands
+function sendCommand(action) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action }));
+        console.log("Sent:", action);
+    }
+}
+
+// ✅ Voice recognition
+function startVoice() {
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("Voice recognition not supported in this browser.");
+        return;
+    }
+    let recognition = new webkitSpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.start();
+    recognition.onresult = function(event) {
+        let command = event.results[0][0].transcript.toLowerCase();
+        if (command.includes("start")) sendCommand("start");
+        else if (command.includes("stop")) sendCommand("stop");
+    }
+}
+
+// ✅ Collapsible
+document.querySelectorAll(".collapsible").forEach(button => {
+    button.addEventListener("click", function() {
+        this.classList.toggle("active");
+        let content = this.nextElementSibling;
+        content.style.display = (content.style.display === "block") ? "none" : "block";
+    });
+});
+
+// ✅ WebGPU init
+async function initWebGPU() {
+    await tf.setBackend('webgpu');
+    console.log("WebGPU backend initialized ✅");
+}
+
+// ✅ Webcam + Canvas
+async function initVideo() {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    const videoEl = document.getElementById('localVideo');
+    videoEl.srcObject = stream;
+
+    const canvasEl = document.getElementById('processedVideo');
+    const ctx = canvasEl.getContext('2d');
+
+    videoEl.addEventListener('play', () => {
+        setInterval(() => {
+            // Future: replace with tf.js model inference
+            ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+        }, 30); // 30 FPS
+    });
+}
+
+// ✅ Telegram API Hook (needs bot token + chat ID)
+async function sendTelegram(message) {
+    const botToken = "8079952068:AAG-VUNolMStxB4b3EP9Xr73bqF-1V122zA";
+    const chatId = "6388656492";
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: message })
+    });
+    console.log("Message sent to Telegram:", message);
+}
+</script>
+</body>
+</html>
